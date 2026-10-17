@@ -1,5 +1,5 @@
 name: ARM (jmbrenot-infra)
-version: "0.2.8-jmb.2"
+version: "0.2.8-jmb.3"
 slug: arm
 description: Automatic Ripping Machine
 link: https://github.com/jmbrenot-infra/ARM-HASS-Addon
@@ -17,8 +17,10 @@ watchdog: "http://[HOST]:8089"
 webui: "http://[HOST]:[PORT:8089]"
 options:
   web_port: 8089
+  auto_rip: true
 schema:
   web_port: int
+  auto_rip: bool
 map:
   - addon_config:rw
   - share:rw

@@ -29,5 +29,9 @@ if [ -z "${ID_CDROM_MEDIA_CD}${ID_CDROM_MEDIA_CD_R}${ID_CDROM_MEDIA_CD_RW}${ID_C
     echo "[ARM] shim: /dev/${DEVNAME} CD=${ID_CDROM_MEDIA_CD:-} DVD=${ID_CDROM_MEDIA_DVD:-} BD=${ID_CDROM_MEDIA_BD:-} FS=${ID_FS_TYPE:-}" >> "$ADDON_LOG"
 fi
 
+# ARM lists LOGPATH/progress when cleaning old logs (LOGLIFE >= 1) and crashes if it is missing.
+LOGPATH=$(grep -m 1 '^LOGPATH:' /etc/arm/config/arm.yaml 2>/dev/null | sed -e 's/^LOGPATH:[[:space:]]*//' -e 's/[[:space:]]*#.*$//' -e 's/"//g')
+mkdir -p "${LOGPATH:-/media/arm/logs}/progress"
+
 setsid "$ORIG" "$DEVNAME" >> "$ADDON_LOG" 2>&1 < /dev/null &
 exit 0
