@@ -18,5 +18,10 @@ COPY rootfs/entry_jmb.sh /entry_jmb.sh
 RUN chmod +x /usr/local/bin/arm_disc_watcher.sh /entry_jmb.sh
 ENTRYPOINT ["/entry_jmb.sh"]
 
-# Default config for new installs: point ABCDE_CONFIG_FILE to the file edited by the web UI.
+# Default config for new installs: point ABCDE_CONFIG_FILE to the file edited by the web UI,
+# and default abcde to FLAC with ALBUMARTIST and plain playlist names.
 COPY rootfs/defaults/arm.yaml /defaults/arm.yaml
+COPY rootfs/defaults/abcde.conf /defaults/abcde.conf
+
+# Ask Music Assistant to sync after each rip (options ma_url, ma_token, ma_provider).
+COPY rootfs/arm_ma_sync.py /usr/local/bin/arm_ma_sync.py
