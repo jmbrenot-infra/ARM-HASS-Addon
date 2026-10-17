@@ -2,6 +2,10 @@
 
 All notable changes to the ARM Home Assistant add-on are documented in this file. Release dates use the YYYY-MM-DD format.
 
+## [0.2.8-jmb.2] - 2026-10-17
+
+- **Fixed**: Rips started by the shim crashed with `FileNotFoundError: /home/arm/logs/arm.log`. `/home/arm/logs` is now a link to `LOGPATH` (`/media/arm/logs`), so the log is kept and listed in the web UI.
+
 ## [0.2.8-jmb.1] - 2026-10-17
 
 - **Fixed**: The web UI "Manual" start no longer ejects audio CDs without ripping. A shim installed over `docker_arm_wrapper.sh` reads the udev properties (`ID_CDROM_MEDIA_*`, `ID_FS_TYPE`) with `udevadm info` when they are missing, then runs the original wrapper in the background and logs to the add-on log.
