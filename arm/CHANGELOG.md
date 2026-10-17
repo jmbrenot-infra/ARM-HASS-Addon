@@ -2,6 +2,12 @@
 
 All notable changes to the ARM Home Assistant add-on are documented in this file. Release dates use the YYYY-MM-DD format.
 
+## [0.2.8-jmb.3] - 2026-10-17
+
+- **Added**: Option `auto_rip` (default `true`): a watcher polls the udev database every 5 s and starts a rip when a disc is inserted, since Home Assistant OS runs no udev rule for ARM. Discs already present at start are ignored. The web UI "Manual" start still works.
+- **Fixed**: The shim creates `LOGPATH/progress`, which ARM lists when cleaning old logs (`LOGLIFE` >= 1) and crashed on when missing.
+- **Fixed**: New installs default `ABCDE_CONFIG_FILE` to `/etc/arm/config/abcde.conf`, the file edited by the web UI "abcde Config" tab. Before, rips used abcde defaults (Ogg, interactive, output in the container) because `/media/arm/config/abcde.conf` did not exist. Existing installs keep their `arm.yaml`: change the setting in the web UI.
+
 ## [0.2.8-jmb.2] - 2026-10-17
 
 - **Fixed**: Rips started by the shim crashed with `FileNotFoundError: /home/arm/logs/arm.log`. `/home/arm/logs` is now a link to `LOGPATH` (`/media/arm/logs`), so the log is kept and listed in the web UI.

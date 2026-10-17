@@ -11,3 +11,12 @@ RUN chmod +x /opt/arm/scripts/docker/docker_arm_wrapper.sh /opt/arm/scripts/dock
 # mounts /home/arm from the host). Point it to LOGPATH (/media/arm/logs, created by run.sh at start)
 # so the log is persistent and listed in the web UI.
 RUN mkdir -p /home/arm && rm -rf /home/arm/logs && ln -s /media/arm/logs /home/arm/logs
+
+# Start a disc insertion watcher (option auto_rip) before the upstream start script.
+COPY rootfs/arm_disc_watcher.sh /usr/local/bin/arm_disc_watcher.sh
+COPY rootfs/entry_jmb.sh /entry_jmb.sh
+RUN chmod +x /usr/local/bin/arm_disc_watcher.sh /entry_jmb.sh
+ENTRYPOINT ["/entry_jmb.sh"]
+
+# Default config for new installs: point ABCDE_CONFIG_FILE to the file edited by the web UI.
+COPY rootfs/defaults/arm.yaml /defaults/arm.yaml
