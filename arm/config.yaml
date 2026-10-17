@@ -1,12 +1,11 @@
-name: ARM
-version: "0.2.8"
+name: ARM (jmbrenot-infra)
+version: "0.2.8-jmb.1"
 slug: arm
 description: Automatic Ripping Machine
-link: https://github.com/mliradelc/ARM-HASS-Addon
+link: https://github.com/jmbrenot-infra/ARM-HASS-Addon
 arch:
   - amd64
   - aarch64
-image: ghcr.io/mliradelc/arm-hass-addon
 startup: application
 boot: auto
 init: true
