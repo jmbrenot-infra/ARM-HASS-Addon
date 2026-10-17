@@ -2,6 +2,11 @@
 
 All notable changes to the ARM Home Assistant add-on are documented in this file. Release dates use the YYYY-MM-DD format.
 
+## [0.2.8-jmb.4] - 2026-10-18
+
+- **Added**: Options `ma_url`, `ma_token`, `ma_provider`: after each rip, the add-on asks Music Assistant to sync that provider (API command `music/sync`), so the album shows up without waiting for the 12-hour scheduled sync. Empty options disable it.
+- **Changed**: New installs default abcde to FLAC, write `ALBUMARTIST` (through `COMMENT`) and name playlists `Artist-Album.m3u`.
+
 ## [0.2.8-jmb.3] - 2026-10-17
 
 - **Added**: Option `auto_rip` (default `true`): a watcher polls the udev database every 5 s and starts a rip when a disc is inserted, since Home Assistant OS runs no udev rule for ARM. Discs already present at start are ignored. The web UI "Manual" start still works.
