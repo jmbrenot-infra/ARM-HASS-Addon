@@ -2,6 +2,11 @@
 
 All notable changes to the ARM Home Assistant add-on are documented in this file. Release dates use the YYYY-MM-DD format.
 
+## [0.2.8-jmb.1] - 2026-10-17
+
+- **Fixed**: The web UI "Manual" start no longer ejects audio CDs without ripping. A shim installed over `docker_arm_wrapper.sh` reads the udev properties (`ID_CDROM_MEDIA_*`, `ID_FS_TYPE`) with `udevadm info` when they are missing, then runs the original wrapper in the background and logs to the add-on log.
+- **Changed**: The image is built locally by the Supervisor from `arm/Dockerfile`, based on the pinned upstream image `ghcr.io/mliradelc/arm-hass-addon:0.2.8`.
+
 ## [0.2.8] - 2025-10-30
 
 - **Fixed**: Added the `root` user to the `cdrom` and `disk` groups within the container to resolve device permission errors when accessing optical drives.
