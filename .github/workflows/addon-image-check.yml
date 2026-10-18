@@ -1,0 +1,48 @@
+name: Add-on image check
+
+# Builds the add-on image like the Supervisor does and checks that the upstream files and
+# commands the fork relies on are still there.
+on:
+  pull_request:
+    paths:
+      - 'arm/**'
+      - '.docker/**'
+      - 'tests/**'
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          shellcheck -x arm/rootfs/arm_disc_watcher.sh arm/rootfs/docker_arm_wrapper_shim.sh \
+            arm/rootfs/entry_jmb.sh .github/scripts/*.sh tests/*.sh
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build add-on image (amd64)
+        run: docker build -t arm-addon-check arm/
+
+      - name: Check entrypoint
+        run: |
+          entrypoint=$(docker inspect -f '{{json .Config.Entrypoint}}' arm-addon-check)
+          echo "Entrypoint: $entrypoint"
+          [[ "$entrypoint" == *'/entry_jmb.sh'* ]]
+
+      - name: Check anchors
+        run: docker run --rm --entrypoint /bin/bash -v "$PWD/tests:/tests:ro" arm-addon-check /tests/check_anchors.sh

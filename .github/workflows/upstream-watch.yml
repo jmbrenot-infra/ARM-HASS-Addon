@@ -1,0 +1,33 @@
+name: Upstream watch
+
+# Opens one issue per new upstream version (mliradelc add-on tags, ARM releases).
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the issues without opening them'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: bash tests/upstream_watch_test.sh
+
+      - name: Compare with upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: bash .github/scripts/upstream_watch.sh
