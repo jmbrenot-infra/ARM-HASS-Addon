@@ -1,4 +1,6 @@
-FROM docker.io/1337server/automatic-ripping-machine:latest
+# ARM_VERSION pins the ARM release (build-base.yml); "latest" keeps the upstream behaviour.
+ARG ARM_VERSION=latest
+FROM docker.io/1337server/automatic-ripping-machine:${ARM_VERSION}
 
 WORKDIR /
 

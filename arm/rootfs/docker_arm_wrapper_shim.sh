@@ -34,5 +34,6 @@ LOGPATH=$(grep -m 1 '^LOGPATH:' /etc/arm/config/arm.yaml 2>/dev/null | sed -e 's
 mkdir -p "${LOGPATH:-/media/arm/logs}/progress"
 
 # Run the original wrapper (it waits for the end of the rip), then ask Music Assistant to sync.
+# shellcheck disable=SC2016 # $0 and $1 are expanded by the child bash, on purpose
 setsid bash -c '"$0" "$1"; python3 /usr/local/bin/arm_ma_sync.py' "$ORIG" "$DEVNAME" >> "$ADDON_LOG" 2>&1 < /dev/null &
 exit 0

@@ -2,6 +2,13 @@
 
 All notable changes to the ARM Home Assistant add-on are documented in this file. Release dates use the YYYY-MM-DD format.
 
+## [Unreleased]
+
+- **Added**: Workflow `Upstream watch` (every Monday): opens one issue (label `upstream`) per new mliradelc add-on tag or ARM release, and tells whether a Docker image exists for that ARM release. Reference versions are the `io.jmbrenot.upstream.addon` / `io.jmbrenot.upstream.arm` labels of `arm/Dockerfile`.
+- **Added**: Workflow `Build ARM base image`: builds `ghcr.io/jmbrenot-infra/arm-hass-addon:arm-<version>` (linux/amd64) from `1337server/automatic-ripping-machine:<version>` with the recipe in `.docker/Dockerfile`, now pinned by `ARG ARM_VERSION`.
+- **Added**: Workflow `Add-on image check` on pull requests: builds `arm/Dockerfile` and checks the anchors the fork relies on (`tests/check_anchors.sh`), plus shellcheck and actionlint.
+- **Added**: `tools/Update-ArmAddon.ps1`: `-Phase Prepare` prepares the upgrade branch and commit, `-Phase Deploy` installs the update without backup after checking that no rip is running, then checks the add-on log and a test CD. `-WhatIf` changes nothing.
+
 ## [0.2.8-jmb.4] - 2026-10-18
 
 - **Added**: Options `ma_url`, `ma_token`, `ma_provider`: after each rip, the add-on asks Music Assistant to sync that provider (API command `music/sync`), so the album shows up without waiting for the 12-hour scheduled sync. Empty options disable it.
