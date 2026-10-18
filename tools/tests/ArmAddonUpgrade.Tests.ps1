@@ -30,6 +30,14 @@ Describe 'Set-DockerfileBase' {
     }
 }
 
+Describe 'Test-OwnArmBase' {
+    It 'is false on the mliradelc base' { Test-OwnArmBase -DockerfileText $dockerfile | Should Be $false }
+    It 'is true on our own ARM base' {
+        $own = Set-DockerfileBase -DockerfileText $dockerfile -FromImage 'ghcr.io/jmbrenot-infra/arm-hass-addon:arm-2.24.4' -Arm '2.24.4'
+        Test-OwnArmBase -DockerfileText $own | Should Be $true
+    }
+}
+
 Describe 'Add-on version' {
     It 'reads the version' {
         Get-AddonVersion -ConfigText $config | Should Be '0.2.8-jmb.4'
@@ -81,7 +89,8 @@ Describe 'Get-EnvValue' {
 Describe 'Test-ArmIdle' {
     It 'is idle with an empty object' { Test-ArmIdle -JoblistJson '{"results":{}}' | Should Be $true }
     It 'is idle with an empty list' { Test-ArmIdle -JoblistJson '{"results":[]}' | Should Be $true }
-    It 'is idle without results' { Test-ArmIdle -JoblistJson '{"mode":"joblist"}' | Should Be $true }
+    It 'throws without results (unknown state is not idle)' { { Test-ArmIdle -JoblistJson '{"success":false}' } | Should Throw }
+    It 'is busy with a job list' { Test-ArmIdle -JoblistJson '{"results":[{"job_id":1}]}' | Should Be $false }
     It 'is busy with a job' { Test-ArmIdle -JoblistJson '{"results":{"0":{"job_id":1}}}' | Should Be $false }
 }
 

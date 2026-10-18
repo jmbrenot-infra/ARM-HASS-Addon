@@ -43,6 +43,12 @@ function Test-VersionGreater {
     return ([version]$Version -gt [version]$Than)
 }
 
+# True when arm/Dockerfile is based on our own ARM image (build-base.yml) rather than mliradelc.
+function Test-OwnArmBase {
+    param([Parameter(Mandatory = $true)][string]$DockerfileText)
+    return [regex]::IsMatch($DockerfileText, '(?m)^FROM ghcr\.io/jmbrenot-infra/arm-hass-addon:arm-')
+}
+
 function Get-AddonVersion {
     param([Parameter(Mandatory = $true)][string]$ConfigText)
     $m = [regex]::Match($ConfigText, '(?m)^version:\s*"?([^"\r\n]+)"?')
@@ -98,6 +104,10 @@ function Get-EnvValue {
 function Test-ArmIdle {
     param([Parameter(Mandatory = $true)][string]$JoblistJson)
     $data = $JoblistJson | ConvertFrom-Json
+    # A payload without results (error, other API version) is not proof that no rip is running.
+    if ($null -eq $data -or -not ($data.PSObject.Properties.Name -contains 'results')) {
+        throw 'ARM joblist has no results field: cannot tell whether a rip is running'
+    }
     $results = $data.results
     if ($null -eq $results) { return $true }
     if ($results -is [array]) { return ($results.Count -eq 0) }
@@ -127,5 +137,5 @@ function Find-LogLine {
     return $null
 }
 
-Export-ModuleMember -Function Get-UpstreamLabels, Set-DockerfileBase, Test-VersionGreater, Get-AddonVersion, Get-NextAddonVersion,
+Export-ModuleMember -Function Get-UpstreamLabels, Set-DockerfileBase, Test-VersionGreater, Test-OwnArmBase, Get-AddonVersion, Get-NextAddonVersion,
     Set-AddonVersion, Add-ChangelogEntry, Get-EnvValue, Test-ArmIdle, Get-LogTextAfter, Find-LogLine

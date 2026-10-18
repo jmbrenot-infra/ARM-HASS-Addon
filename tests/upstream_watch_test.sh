@@ -2,7 +2,7 @@
 # Unit tests for .github/scripts/upstream_watch.sh (pure functions only, no network).
 set -u
 cd "$(dirname "$0")/.." || exit 1
-# shellcheck source=../.github/scripts/upstream_watch.sh
+# shellcheck source=.github/scripts/upstream_watch.sh
 source .github/scripts/upstream_watch.sh
 
 failures=0

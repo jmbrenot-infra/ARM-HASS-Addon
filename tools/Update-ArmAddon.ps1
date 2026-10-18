@@ -131,6 +131,10 @@ function Invoke-Prepare {
     }
 
     if ($Source -eq 'Addon') {
+        # Going back to a mliradelc image after our own ARM base could bring back an older ARM.
+        if ((Test-OwnArmBase -DockerfileText $dockerfile) -and (-not $ArmVersion -or (Test-VersionGreater -Version $labels.Arm -Than $ArmVersion))) {
+            throw "The image is on our own ARM $($labels.Arm) base: pass -ArmVersion (ARM in mliradelc $Version, see its CHANGELOG), at least $($labels.Arm)"
+        }
         Write-Step "Checking ghcr.io/${AddonBase}:$Version"
         if (-not (Test-GhcrImage $AddonBase $Version)) { throw "ghcr.io/${AddonBase}:$Version not found" }
         Write-Ok 'image found'
@@ -181,7 +185,7 @@ function Invoke-Prepare {
     Write-Host "    CHANGELOG: $($lines -join ' ')"
 
     if ($PSCmdlet.ShouldProcess($branch, 'create branch, write arm/Dockerfile, arm/config.yaml, arm/CHANGELOG.md, commit')) {
-        $null = Invoke-Git @('switch', '--quiet', '-c', $branch, $base)
+        $null = Invoke-Git @('switch', '--quiet', '--no-track', '-c', $branch, $base)
         Write-RepoFile 'arm/Dockerfile' $newDockerfile
         Write-RepoFile 'arm/config.yaml' $newConfig
         Write-RepoFile 'arm/CHANGELOG.md' $newChangelog
@@ -281,6 +285,9 @@ function Invoke-Deploy {
             Write-Ok "$target offered"
         }
 
+        # Log anchor taken before the install: the journal also holds the previous container's lines.
+        $logAnchor = ((Get-AddonLog).TrimEnd() -split "`r?`n" | Select-Object -Last 1)
+
         Write-Step "Install $target without backup"
         if ($PSCmdlet.ShouldProcess($UpdateEntity, "update.install $target (backup: false)")) {
             $answer = Read-Host "    Type 'oui' to install $target now (the add-on restarts, no Home Assistant restart)"
@@ -306,8 +313,8 @@ function Invoke-Deploy {
             Write-Warn2 'simulation: CD test skipped'
             return
         }
-        if (Wait-Until -Condition { Find-LogLine -LogText (Get-AddonLog) -Pattern $WatcherPattern } -Minutes 5 -What 'watcher line in the add-on log') {
-            Write-Ok (Find-LogLine -LogText (Get-AddonLog) -Pattern $WatcherPattern)
+        if (Wait-Until -Condition { Find-LogLine -LogText (Get-LogTextAfter -LogText (Get-AddonLog) -Anchor $logAnchor) -Pattern $WatcherPattern } -Minutes 5 -What 'watcher line in the add-on log') {
+            Write-Ok (Find-LogLine -LogText (Get-LogTextAfter -LogText (Get-AddonLog) -Anchor $logAnchor) -Pattern $WatcherPattern)
         } else {
             Show-LogTail
             throw 'Watcher line not found (option auto_rip off, or the add-on did not start)'
