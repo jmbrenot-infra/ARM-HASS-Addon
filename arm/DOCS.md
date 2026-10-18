@@ -146,6 +146,18 @@ ls -la /etc/arm/config
 find /config -type f
 ```
 
+## Upstream Updates (jmbrenot-infra fork)
+
+The fork pins its base image, so Home Assistant never offers upstream updates by itself.
+
+- The `Upstream watch` workflow runs every Monday and opens one issue (label `upstream`) per new
+  mliradelc add-on tag or ARM release. The reference versions are the `io.jmbrenot.upstream.*` labels in `arm/Dockerfile`.
+- `tools/Update-ArmAddon.ps1 -Phase Prepare -Source Addon|Arm -Version X` prepares the branch and commits
+  locally (`-Source Arm` first builds our base image with `build-base.yml`). The `Add-on image check` workflow
+  verifies the fork anchors on the PR.
+- After the merge, `tools/Update-ArmAddon.ps1 -Phase Deploy` checks that no rip is running, installs the update
+  without backup after confirmation, then checks the add-on log and a test CD. Use `-WhatIf` first.
+
 ## Support
 
 For issues and questions:

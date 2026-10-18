@@ -35,6 +35,14 @@ function Set-DockerfileBase {
     return $text
 }
 
+function Test-VersionGreater {
+    param(
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$Than
+    )
+    return ([version]$Version -gt [version]$Than)
+}
+
 function Get-AddonVersion {
     param([Parameter(Mandatory = $true)][string]$ConfigText)
     $m = [regex]::Match($ConfigText, '(?m)^version:\s*"?([^"\r\n]+)"?')
@@ -96,6 +104,18 @@ function Test-ArmIdle {
     return (@($results.PSObject.Properties).Count -eq 0)
 }
 
+# Log text after the last occurrence of Anchor (a line seen before), or all of it when absent.
+function Get-LogTextAfter {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$LogText,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Anchor
+    )
+    if (-not $Anchor) { return $LogText }
+    $index = $LogText.LastIndexOf($Anchor)
+    if ($index -lt 0) { return $LogText }
+    return $LogText.Substring($index + $Anchor.Length)
+}
+
 function Find-LogLine {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$LogText,
@@ -107,5 +127,5 @@ function Find-LogLine {
     return $null
 }
 
-Export-ModuleMember -Function Get-UpstreamLabels, Set-DockerfileBase, Get-AddonVersion, Get-NextAddonVersion,
-    Set-AddonVersion, Add-ChangelogEntry, Get-EnvValue, Test-ArmIdle, Find-LogLine
+Export-ModuleMember -Function Get-UpstreamLabels, Set-DockerfileBase, Test-VersionGreater, Get-AddonVersion, Get-NextAddonVersion,
+    Set-AddonVersion, Add-ChangelogEntry, Get-EnvValue, Test-ArmIdle, Get-LogTextAfter, Find-LogLine

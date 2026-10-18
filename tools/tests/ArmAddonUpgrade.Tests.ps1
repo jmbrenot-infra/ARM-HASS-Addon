@@ -47,6 +47,13 @@ Describe 'Add-on version' {
     }
 }
 
+Describe 'Test-VersionGreater' {
+    It 'is true for a newer version' { Test-VersionGreater -Version '2.24.4' -Than '2.20.5' | Should Be $true }
+    It 'compares numerically' { Test-VersionGreater -Version '0.2.10' -Than '0.2.9' | Should Be $true }
+    It 'is false for the same version' { Test-VersionGreater -Version '0.2.8' -Than '0.2.8' | Should Be $false }
+    It 'is false for an older version' { Test-VersionGreater -Version '2.20.4' -Than '2.20.5' | Should Be $false }
+}
+
 Describe 'Add-ChangelogEntry' {
     It 'inserts the entry before the first release and keeps the header' {
         $new = Add-ChangelogEntry -ChangelogText $changelog -Version '0.2.8-jmb.5' -Date '2026-10-19' -Lines @('- **Changed**: test.')
@@ -76,6 +83,20 @@ Describe 'Test-ArmIdle' {
     It 'is idle with an empty list' { Test-ArmIdle -JoblistJson '{"results":[]}' | Should Be $true }
     It 'is idle without results' { Test-ArmIdle -JoblistJson '{"mode":"joblist"}' | Should Be $true }
     It 'is busy with a job' { Test-ArmIdle -JoblistJson '{"results":{"0":{"job_id":1}}}' | Should Be $false }
+}
+
+Describe 'Get-LogTextAfter' {
+    $old = "[t1] a`n[ARM] ma-sync: 1 sync task(s) started`n[t2] last`n"
+    It 'keeps only what follows the last occurrence of the anchor' {
+        $new = $old + "[t3] rip`n[ARM] ma-sync: 2 sync task(s) started`n"
+        Get-LogTextAfter -LogText $new -Anchor '[t2] last' | Should Be "`n[t3] rip`n[ARM] ma-sync: 2 sync task(s) started`n"
+    }
+    It 'returns everything when the anchor scrolled out' {
+        Get-LogTextAfter -LogText "[t9] x`n" -Anchor '[t2] last' | Should Be "[t9] x`n"
+    }
+    It 'returns everything with an empty anchor' {
+        Get-LogTextAfter -LogText $old -Anchor '' | Should Be $old
+    }
 }
 
 Describe 'Find-LogLine' {
