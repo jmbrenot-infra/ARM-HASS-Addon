@@ -26,8 +26,11 @@ jobs:
           shellcheck -x arm/rootfs/arm_disc_watcher.sh arm/rootfs/docker_arm_wrapper_shim.sh \
             arm/rootfs/entry_jmb.sh .github/scripts/*.sh tests/*.sh
 
+      # Fork workflows only: the upstream build-and-push.yml is left as mliradelc wrote it.
       - name: actionlint
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color \
+            .github/workflows/upstream-watch.yml .github/workflows/build-base.yml .github/workflows/addon-image-check.yml
 
   image:
     runs-on: ubuntu-latest
