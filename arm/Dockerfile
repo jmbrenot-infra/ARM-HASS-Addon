@@ -11,6 +11,15 @@ RUN mv /opt/arm/scripts/docker/docker_arm_wrapper.sh /opt/arm/scripts/docker/doc
 COPY rootfs/docker_arm_wrapper_shim.sh /opt/arm/scripts/docker/docker_arm_wrapper.sh
 RUN chmod +x /opt/arm/scripts/docker/docker_arm_wrapper.sh /opt/arm/scripts/docker/docker_arm_wrapper.orig.sh
 
+# Upstream crashes the whole rip job over a debug *log message*: put_track() does int(t_no)
+# just to zero-pad the track number for logging.debug(), with no fallback for a release whose
+# tracks are numbered non-numerically (e.g. "A1"/"B2" for a vinyl-only MusicBrainz match). The
+# grep before and after makes the build fail loudly if upstream ever changes this line, instead
+# of silently shipping the bug again. (jmbrenot-infra/ARM-HASS-Addon#9)
+RUN grep -q 'Track #{int(t_no):02}' /opt/arm/arm/ripper/utils.py \
+    && sed -i 's/Track #{int(t_no):02}/Track #{t_no}/' /opt/arm/arm/ripper/utils.py \
+    && grep -q 'Track #{t_no}' /opt/arm/arm/ripper/utils.py
+
 # ARM writes its main log to /home/arm/logs/arm.log, which does not exist in this image (upstream
 # mounts /home/arm from the host). Point it to LOGPATH (/media/arm/logs, created by run.sh at start)
 # so the log is persistent and listed in the web UI.
