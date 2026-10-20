@@ -9,8 +9,10 @@
     addon-image-check workflow pass, merge.
 
     Phase Deploy (Home Assistant, after the merge): checks that no rip is running, refreshes the update
-    entity, installs the update WITHOUT backup after a typed confirmation, then checks the add-on log
-    (disc watcher, then Music Assistant sync after a test CD).
+    entity, installs the update WITHOUT backup after a typed confirmation, checks the add-on log (disc
+    watcher), deploys tools/nasplus-scripts/*.py to NASPLUS /volume1/scripts/ (pscp + sudo mv -- the
+    scheduled task there, "Normalize Unknown Album Tags", already calls these scripts), then checks
+    Music Assistant sync after a test CD.
 
     -WhatIf writes nothing: no file, no git change, no workflow run, no Home Assistant action.
     Never restarts Home Assistant. ASCII only, Windows PowerShell 5.1 compatible.
@@ -246,6 +248,52 @@ function Assert-ArmIdle {
     Write-Ok 'no active rip'
 }
 
+function Deploy-NasplusScripts {
+    param(
+        [string]$NasplusHost = '192.168.0.52',
+        [string]$NasplusUser = 'codex-temp',
+        [string]$KnownHostsPath = 'W:\nasplus_known_hosts'
+    )
+    $scriptsDir = Join-Path $RepoRoot 'tools\nasplus-scripts'
+    $files = Get-ChildItem -Path $scriptsDir -Filter '*.py' -ErrorAction SilentlyContinue
+    if (-not $files) { Write-Warn2 "no scripts found in $scriptsDir, skipping NASPLUS deploy"; return }
+
+    # codex-temp has no write access to /volume1/scripts (owned root:root). A one-time sudoers drop-in
+    # (/etc/sudoers.d/codex-temp-nasplus-scripts, NOPASSWD, scoped to exactly these mv/chown/chmod
+    # invocations) lets this run key-only, no password of any kind over the wire -- piping a password
+    # to `sudo -S` through PowerShell's redirected stdin was tried first and is NOT reliable (plink and
+    # the native ssh client both silently drop or mistime the piped bytes here; do not revert to it).
+    # Login itself still needs its own key, separate from codex-temp's shared DSM password.
+    $keyPath = [System.IO.Path]::GetTempFileName()
+    try {
+        $keyB64 = Get-EnvValue -Path $EnvPath -Name 'CODEX_TEMP_NASPLUS_SSH_PRIVATE_KEY_B64'
+        [System.IO.File]::WriteAllBytes($keyPath, [System.Convert]::FromBase64String($keyB64))
+        # OpenSSH refuses a private key file with inherited/broad ACLs ("Bad permissions") -- reset to
+        # the current user only (equivalent of chmod 600), via .NET ACL cmdlets (not icacls.exe).
+        $acl = New-Object System.Security.AccessControl.FileSecurity
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, 'FullControl', 'Allow')))
+        Set-Acl -Path $keyPath -AclObject $acl
+
+        $sshArgs = @('-i', $keyPath, '-o', "UserKnownHostsFile=$KnownHostsPath", '-o', 'StrictHostKeyChecking=yes')
+        foreach ($f in $files) {
+            # -O forces the legacy SCP protocol: this DSM's default SFTP subsystem for codex-temp
+            # rejects absolute paths like /tmp (confirmed empirically), legacy SCP does not.
+            & scp -O @sshArgs $f.FullName "${NasplusUser}@${NasplusHost}:/tmp/$($f.Name)" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "scp failed for $($f.Name)" }
+        }
+        $names = ($files | ForEach-Object { $_.Name }) -join ' '
+        $remoteScript = "for f in $names; do sudo mv /tmp/`$f /volume1/scripts/`$f && sudo chown root:root /volume1/scripts/`$f && sudo chmod 755 /volume1/scripts/`$f; done"
+        $out = & ssh @sshArgs "${NasplusUser}@${NasplusHost}" $remoteScript 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "remote install failed: $out" }
+        Write-Ok "$($files.Count) script(s) deployed to NASPLUS /volume1/scripts/ ($names)"
+    } finally {
+        # The ACL set above already grants the current user explicit FullControl, which is enough
+        # to delete the file regardless of inheritance protection -- no need to touch the ACL again.
+        Remove-Item -Path $keyPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Show-LogTail {
     $log = Get-AddonLog
     Write-Host '    --- last add-on log lines ---'
@@ -310,7 +358,7 @@ function Invoke-Deploy {
         if ($WhatIfPreference) {
             $line = Find-LogLine -LogText (Get-AddonLog) -Pattern $WatcherPattern
             if ($line) { Write-Ok "current log: $line" } else { Write-Warn2 'no watcher line in the current log (expected right after the update)' }
-            Write-Warn2 'simulation: CD test skipped'
+            Write-Warn2 'simulation: NASPLUS scripts deploy and CD test skipped'
             return
         }
         if (Wait-Until -Condition { Find-LogLine -LogText (Get-LogTextAfter -LogText (Get-AddonLog) -Anchor $logAnchor) -Pattern $WatcherPattern } -Minutes 5 -What 'watcher line in the add-on log') {
@@ -318,6 +366,11 @@ function Invoke-Deploy {
         } else {
             Show-LogTail
             throw 'Watcher line not found (option auto_rip off, or the add-on did not start)'
+        }
+
+        Write-Step 'NASPLUS maintenance scripts'
+        if ($PSCmdlet.ShouldProcess('NASPLUS /volume1/scripts', 'deploy tools/nasplus-scripts/*.py via pscp + sudo')) {
+            Deploy-NasplusScripts
         }
 
         if ($SkipCdTest) { Write-Warn2 'CD test skipped'; return }
