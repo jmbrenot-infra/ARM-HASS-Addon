@@ -1,5 +1,5 @@
 name: ARM (jmbrenot-infra)
-version: "0.2.8-jmb.6"
+version: "0.2.8-jmb.7"
 slug: arm
 description: Automatic Ripping Machine
 link: https://github.com/jmbrenot-infra/ARM-HASS-Addon
