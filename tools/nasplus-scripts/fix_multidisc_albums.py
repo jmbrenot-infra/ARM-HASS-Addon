@@ -32,6 +32,7 @@ from mutagen.flac import FLAC
 
 DEFAULT_ROOT = "/volume1/music/Rips-CD"
 MTIME_GAP_SECONDS = 120
+DISC_DIRECTORY_RE = re.compile(r"^CD([1-9]\d*)$")
 
 
 def sanitize(name: str) -> str:
@@ -60,27 +61,50 @@ def list_albums(root: str):
 
 def read_flacs(album_path: str):
     files = []
-    for name in sorted(os.listdir(album_path)):
-        if not name.lower().endswith(".flac"):
-            continue
-        p = os.path.join(album_path, name)
-        if not os.path.isfile(p):
-            continue  # Synology @eaDir can contain a directory named like a .flac file
-        f = FLAC(p)
-        files.append({
-            "name": name, "path": p,
-            "tracknumber": f.get("tracknumber", [None])[0],
-            "title": f.get("title", [None])[0],
-            "cddb": f.get("cddb", [None])[0],
-            "mtime": os.path.getmtime(p),
-            "flac": f,
-        })
+    directories = [(album_path, None)]
+    for name in os.listdir(album_path):
+        match = DISC_DIRECTORY_RE.match(name)
+        path = os.path.join(album_path, name)
+        if match and os.path.isdir(path):
+            directories.append((path, int(match.group(1))))
+
+    for directory, current_disc_num in sorted(directories, key=lambda item: item[1] or 0):
+        for name in sorted(os.listdir(directory)):
+            if not name.lower().endswith(".flac"):
+                continue
+            p = os.path.join(directory, name)
+            if not os.path.isfile(p):
+                continue  # Synology @eaDir can contain a directory named like a .flac file
+            f = FLAC(p)
+            files.append({
+                "name": name, "path": p, "current_disc_num": current_disc_num,
+                "tracknumber": f.get("tracknumber", [None])[0],
+                "title": f.get("title", [None])[0],
+                "cddb": f.get("cddb", [None])[0],
+                "mtime": os.path.getmtime(p),
+                "flac": f,
+            })
     return files
 
 
 def detect_disc_groups(files):
     for d in files:
         d["_leading"] = leading_number_token(d["name"])
+
+    # Once an album has CDn directories, cddb is the only reliable way to
+    # reconnect newly-arrived flat files with their already sorted disc.  In
+    # particular, the normalized names inside CDn no longer carry abcde's
+    # original disc/track filename prefix.
+    by_cddb = defaultdict(list)
+    for d in files:
+        by_cddb[d["cddb"]].append(d)
+    real_cddbs = [k for k in by_cddb if k is not None]
+    if any(d["current_disc_num"] is not None for d in files) and len(real_cddbs) > 1:
+        ordered = sorted(real_cddbs, key=lambda k: min(x["mtime"] for x in by_cddb[k]))
+        for k in ordered:
+            for d in by_cddb[k]:
+                d["local_track"] = d["tracknumber"]
+        return [by_cddb[k] for k in ordered]
 
     has_prefix = any(d["_leading"] and re.match(r"^\d+-\d+$", d["_leading"]) for d in files)
     if has_prefix:
@@ -105,10 +129,6 @@ def detect_disc_groups(files):
             groups[disc].append(d)
         return [groups[k] for k in sorted(groups.keys())] if len(groups) > 1 else None
 
-    by_cddb = defaultdict(list)
-    for d in files:
-        by_cddb[d["cddb"]].append(d)
-    real_cddbs = [k for k in by_cddb if k is not None]
     if len(real_cddbs) > 1:
         ordered = sorted(real_cddbs, key=lambda k: min(x["mtime"] for x in by_cddb[k]))
         groups = []
@@ -158,9 +178,24 @@ def plan_album(album_path: str):
     groups = detect_disc_groups(files)
     if not groups:
         return None
-    total = len(groups)
+    existing_disc_nums = {d["current_disc_num"] for d in files if d["current_disc_num"] is not None}
+    next_disc_num = max(existing_disc_nums, default=0)
+    group_disc_nums = []
+    for group in groups:
+        group_existing_disc_nums = {d["current_disc_num"] for d in group if d["current_disc_num"] is not None}
+        if len(group_existing_disc_nums) > 1:
+            raise ValueError("a detected disc group spans multiple existing CD directories")
+        if group_existing_disc_nums:
+            group_disc_nums.append(group_existing_disc_nums.pop())
+        else:
+            next_disc_num += 1
+            group_disc_nums.append(next_disc_num)
+
+    # DISCNUMBER values are directory numbers, so a sparse pre-existing
+    # layout (for example CD1 and CD3) must retain its highest number too.
+    total = max(group_disc_nums)
     plan = []
-    for disc_num, group in enumerate(groups, start=1):
+    for disc_num, group in zip(group_disc_nums, groups):
         for d in group:
             local_track = d.get("local_track") or d["tracknumber"] or "00"
             try:
@@ -168,12 +203,21 @@ def plan_album(album_path: str):
             except (TypeError, ValueError):
                 local_track_fmt = local_track
             new_name = f"{local_track_fmt} - {sanitize(d['title'] or 'Unknown')}.flac"
+            new_rel = os.path.join(f"CD{disc_num}", new_name)
+            new_path = os.path.join(album_path, new_rel)
+            expected_disc_num = [str(disc_num)]
+            expected_disc_total = [str(total)]
+            needs_move = os.path.normpath(d["path"]) != os.path.normpath(new_path)
+            needs_retag = (
+                list(d["flac"].get("discnumber", [])) != expected_disc_num
+                or list(d["flac"].get("disctotal", [])) != expected_disc_total
+            )
             plan.append({
                 "old_path": d["path"], "old_name": d["name"],
-                "new_rel": os.path.join(f"CD{disc_num}", new_name),
-                "disc_num": disc_num, "disc_total": total, "flac": d["flac"],
+                "new_rel": new_rel, "disc_num": disc_num, "disc_total": total,
+                "flac": d["flac"], "needs_move": needs_move, "needs_retag": needs_retag,
             })
-    return plan
+    return sorted(plan, key=lambda it: (it["disc_num"], it["new_rel"]))
 
 
 def main() -> int:
@@ -204,13 +248,17 @@ def main() -> int:
             continue
         try:
             for it in plan:
+                if not it["needs_move"] and not it["needs_retag"]:
+                    continue
                 new_path = os.path.join(album_path, it["new_rel"])
                 os.makedirs(os.path.dirname(new_path), exist_ok=True)
                 f = it["flac"]
-                f["discnumber"] = [str(it["disc_num"])]
-                f["disctotal"] = [str(it["disc_total"])]
-                f.save()
-                shutil.move(it["old_path"], new_path)
+                if it["needs_retag"]:
+                    f["discnumber"] = [str(it["disc_num"])]
+                    f["disctotal"] = [str(it["disc_total"])]
+                    f.save()
+                if it["needs_move"]:
+                    shutil.move(it["old_path"], new_path)
             write_m3u(args.root, artist, album, plan)
             albums_fixed += 1
         except Exception as error:
