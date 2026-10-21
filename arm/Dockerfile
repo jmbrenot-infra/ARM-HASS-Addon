@@ -74,3 +74,7 @@ COPY rootfs/defaults/abcde.conf /defaults/abcde.conf
 
 # Ask Music Assistant to sync after each rip (options ma_url, ma_token, ma_provider).
 COPY rootfs/arm_ma_sync.py /usr/local/bin/arm_ma_sync.py
+
+# Move a finished DVD/Blu-ray rip next to its matching music album (ARM-HASS-Addon#21); a
+# no-op for an audio CD job.
+COPY rootfs/arm_video_to_album.py /usr/local/bin/arm_video_to_album.py
