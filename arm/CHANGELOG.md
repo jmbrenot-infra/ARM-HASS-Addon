@@ -4,6 +4,7 @@ All notable changes to the ARM Home Assistant add-on are documented in this file
 
 ## [Unreleased]
 
+- **Added**: After a DVD/Blu-ray rip, `arm_video_to_album.py` moves the resulting video (transcoded if HandBrake succeeded, otherwise the raw rip) next to its matching music album under `/media/music/<Artist>/<Album>/`, matched by keyword against the disc's label -- e.g. a bonus DVD bundled with a CD. No unambiguous match: moves to `Unknown Artist/Unknown Album_<job id>` instead of guessing, same convention as unidentified audio CDs. No-op for an audio CD job. (jmbrenot-infra/ARM-HASS-Addon#21)
 - **Added**: Workflow `Upstream watch` (every Monday): opens one issue (label `upstream`) per new mliradelc add-on tag or ARM release, and tells whether a Docker image exists for that ARM release. Reference versions are the `io.jmbrenot.upstream.addon` / `io.jmbrenot.upstream.arm` labels of `arm/Dockerfile`.
 - **Added**: Workflow `Build ARM base image`: builds `ghcr.io/jmbrenot-infra/arm-hass-addon:arm-<version>` (linux/amd64) from `1337server/automatic-ripping-machine:<version>` with the recipe in `.docker/Dockerfile`, now pinned by `ARG ARM_VERSION`.
 - **Added**: Workflow `Add-on image check` on pull requests: builds `arm/Dockerfile` and checks the anchors the fork relies on (`tests/check_anchors.sh`), plus shellcheck and actionlint.

@@ -21,6 +21,7 @@ for cmd in udevadm python3 abcde setsid flac; do
     check "command $cmd" command -v "$cmd"
 done
 check "arm_ma_sync.py compiles" python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/arm_ma_sync.pyc", doraise=True)' /usr/local/bin/arm_ma_sync.py
+check "arm_video_to_album.py compiles" python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/arm_video_to_album.pyc", doraise=True)' /usr/local/bin/arm_video_to_album.py
 
 if [ -r /opt/arm/VERSION ]; then
     echo "ARM version: $(cat /opt/arm/VERSION)"
