@@ -29,6 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && make -s -j"$(nproc)" && make install \
     && cd / && rm -rf /tmp/makemkv-* /tmp/*.tar.gz /tmp/*.txt \
     && rm -rf /var/lib/apt/lists/*
+# makemkv-bin's own `make install` puts the binary at /usr/bin/makemkvcon, but ARM calls
+# /usr/local/bin/makemkvcon (hardcoded) -- the upstream base image's stale makemkvcon lives
+# there. Without this, the freshly built binary above is simply never invoked: ARM keeps
+# running the old one and reports the exact same "too old" failure (ARM-HASS-Addon#19,
+# found only by setting LOGLEVEL=DEBUG and reading the actual `MakeMKV vX.Y.Z started`
+# line -- it said v1.18.2, the base image's version, not the one just built).
+RUN ln -sf /usr/bin/makemkvcon /usr/local/bin/makemkvcon
 # Deliberately NOT purging the -dev build packages afterwards: several of them (libavcodec-dev,
 # qtbase5-dev, libgl1-mesa-dev...) pull in runtime shared libraries makemkvcon links against as
 # automatic dependencies, and `apt-get autoremove` after purging only the -dev packages could take
