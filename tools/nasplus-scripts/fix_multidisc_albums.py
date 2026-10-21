@@ -15,6 +15,10 @@ Disc order within a detected group is: filename-encoded disc number if
 present, otherwise earliest-mtime-first. This is a *default*, not
 necessarily the disc order printed on the physical box set -- run
 --dry-run first and sanity-check unusual results by hand.
+
+After reorganizing an album, the top-level `<Artist>-<Album>.m3u` playlist
+is (re)written to list the new per-disc paths -- otherwise it would keep
+pointing at the old flat layout (or simply be missing) after the move.
 """
 
 import argparse
@@ -136,6 +140,17 @@ def detect_disc_groups(files):
     return None
 
 
+def write_m3u(root: str, artist: str, album: str, plan: list) -> str:
+    """(Re)write the top-level `<Artist>-<Album>.m3u` playlist after an album has been
+    reorganized into CD1/CD2/.../CDN, so it reflects the new per-disc paths instead of
+    the stale flat ones. Returns the path written."""
+    lines = [os.path.join(artist, album, it["new_rel"]) for it in plan]
+    m3u_path = os.path.join(root, f"{sanitize(artist)}-{sanitize(album)}.m3u")
+    with open(m3u_path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return m3u_path
+
+
 def plan_album(album_path: str):
     files = read_flacs(album_path)
     if not files:
@@ -196,6 +211,7 @@ def main() -> int:
                 f["disctotal"] = [str(it["disc_total"])]
                 f.save()
                 shutil.move(it["old_path"], new_path)
+            write_m3u(args.root, artist, album, plan)
             albums_fixed += 1
         except Exception as error:
             failures += 1

@@ -12,7 +12,8 @@ impossible d'en créer une seconde depuis le CLI).
   au disque). Détection par ordre de fiabilité : préfixe de disque dans le nom de fichier
   (`2-01 - Titre.flac`), préfixe à 3 chiffres (`104 Titre.flac` = disque 1 piste 04), tag `cddb`
   (un hash distinct par disque physique), puis en dernier recours un écart de date de modification
-  entre pistes (peu fiable, loggué comme tel).
+  entre pistes (peu fiable, loggué comme tel). Régénère aussi le `.m3u` racine de l'album
+  (`<Artiste>-<Album>.m3u`) pour pointer vers les nouveaux chemins `CDn/`.
 - `apply_unknown_album_tag_plan.py`, `export_unknown_album_discids.py`, `inventory_unknown_albums.py`,
   `query_gnudb.py`, `verify_unknown_album_state.py` -- outils d'investigation/application ponctuels
   utilisés pour le correctif rétroactif initial (ticket HA-Auzeville#16).
