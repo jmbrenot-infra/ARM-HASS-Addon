@@ -21,6 +21,17 @@ _int() {
 }
 trap _int SIGINT
 
+# One-shot diagnostic for jmbrenot-infra/ARM-HASS-Addon#17: MakeMKV keeps reporting
+# "This application version is too old" on every DVD rip attempt even after rebuilding
+# it from the latest release (#15). ARM's own beta-key updater scrapes a forum thread
+# for the current key (arm/ripper/makemkv.py prep_mkv(), scripts/update_key.sh) -- log
+# whether that's actually reachable and what key (if any) ends up on disk, since no
+# container shell is available to check this directly (core-ssh is sandboxed, no docker).
+echo "[DIAG] forum.makemkv.com reachability test:"
+curl -v --max-time 15 "https://forum.makemkv.com/forum/viewtopic.php?f=5&t=1053" 2>&1 | tail -40
+echo "[DIAG] settings.conf content (if any):"
+cat /home/arm/.MakeMKV/settings.conf 2>&1 || echo "[DIAG] no settings.conf found"
+
 AUTO_RIP=$(python3 -c 'import json; print(str(json.load(open("/data/options.json")).get("auto_rip", True)).lower())' 2>/dev/null || echo true)
 if [ "$AUTO_RIP" = "true" ]; then
     echo "[INFO] auto_rip enabled: starting disc watcher"
