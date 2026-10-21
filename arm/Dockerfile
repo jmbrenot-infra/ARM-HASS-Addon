@@ -6,6 +6,35 @@ FROM ghcr.io/mliradelc/arm-hass-addon:0.2.8
 LABEL io.jmbrenot.upstream.addon="0.2.8" \
       io.jmbrenot.upstream.arm="2.20.5"
 
+# The MakeMKV baked into the upstream base image was "latest" when that image was last built
+# and has since hit its hard version-expiry (MakeMKV refuses to run at all past this point,
+# no beta or paid key can override it -- only a binary update does, cf. ARM-HASS-Addon#15).
+# Rebuild it from the current latest release every time this image is built, same method the
+# ARM project's own installer uses (scripts/installers/DebianInstaller.sh, BuildAndInstallMakeMKV),
+# so this does not go stale again.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential pkg-config libc6-dev libssl-dev libexpat1-dev \
+      libavcodec-dev libgl1-mesa-dev qtbase5-dev zlib1g-dev ca-certificates \
+    && cd /tmp \
+    && LATEST=$(curl -fsSL https://www.makemkv.com/download/ | grep -o '[0-9.]*\.txt' | sed 's/\.txt//' | head -1) \
+    && test -n "$LATEST" \
+    && curl -fsSL -o makemkv-sha-${LATEST}.txt https://www.makemkv.com/download/makemkv-sha-${LATEST}.txt \
+    && curl -fsSL -o makemkv-oss-${LATEST}.tar.gz https://www.makemkv.com/download/makemkv-oss-${LATEST}.tar.gz \
+    && curl -fsSL -o makemkv-bin-${LATEST}.tar.gz https://www.makemkv.com/download/makemkv-bin-${LATEST}.tar.gz \
+    && grep "makemkv-oss-${LATEST}.tar.gz" makemkv-sha-${LATEST}.txt | sha256sum -c \
+    && grep "makemkv-bin-${LATEST}.tar.gz" makemkv-sha-${LATEST}.txt | sha256sum -c \
+    && tar xzf makemkv-oss-${LATEST}.tar.gz && tar xzf makemkv-bin-${LATEST}.tar.gz \
+    && cd makemkv-oss-${LATEST} && mkdir -p tmp && ./configure >/dev/null && make -s -j"$(nproc)" && make install \
+    && cd ../makemkv-bin-${LATEST} && mkdir -p tmp && echo "yes" > tmp/eula_accepted \
+    && make -s -j"$(nproc)" && make install \
+    && cd / && rm -rf /tmp/makemkv-* /tmp/*.tar.gz /tmp/*.txt \
+    && rm -rf /var/lib/apt/lists/*
+# Deliberately NOT purging the -dev build packages afterwards: several of them (libavcodec-dev,
+# qtbase5-dev, libgl1-mesa-dev...) pull in runtime shared libraries makemkvcon links against as
+# automatic dependencies, and `apt-get autoremove` after purging only the -dev packages could take
+# those runtime libs down with them (untestable from this session -- no Docker build environment
+# available -- so this errs toward a larger image over a silently broken makemkvcon).
+
 # Fill the udev properties missing outside udev, so the web UI "Manual" start can rip.
 RUN mv /opt/arm/scripts/docker/docker_arm_wrapper.sh /opt/arm/scripts/docker/docker_arm_wrapper.orig.sh
 COPY rootfs/docker_arm_wrapper_shim.sh /opt/arm/scripts/docker/docker_arm_wrapper.sh
