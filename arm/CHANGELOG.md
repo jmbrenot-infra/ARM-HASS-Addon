@@ -4,11 +4,14 @@ All notable changes to the ARM Home Assistant add-on are documented in this file
 
 ## [Unreleased]
 
-- **Fixed**: MakeMKV (bundled in the upstream base image) had hit its hard version-expiry and refused to run at all, even with a key ("This application version is too old"), blocking every DVD/Blu-ray rip. `arm/Dockerfile` now rebuilds MakeMKV from the current latest release on every image build, so it stays current automatically. (jmbrenot-infra/ARM-HASS-Addon#15)
 - **Added**: Workflow `Upstream watch` (every Monday): opens one issue (label `upstream`) per new mliradelc add-on tag or ARM release, and tells whether a Docker image exists for that ARM release. Reference versions are the `io.jmbrenot.upstream.addon` / `io.jmbrenot.upstream.arm` labels of `arm/Dockerfile`.
 - **Added**: Workflow `Build ARM base image`: builds `ghcr.io/jmbrenot-infra/arm-hass-addon:arm-<version>` (linux/amd64) from `1337server/automatic-ripping-machine:<version>` with the recipe in `.docker/Dockerfile`, now pinned by `ARG ARM_VERSION`.
 - **Added**: Workflow `Add-on image check` on pull requests: builds `arm/Dockerfile` and checks the anchors the fork relies on (`tests/check_anchors.sh`), plus shellcheck and actionlint.
 - **Added**: `tools/Update-ArmAddon.ps1`: `-Phase Prepare` prepares the upgrade branch and commit, `-Phase Deploy` installs the update without backup after checking that no rip is running, then checks the add-on log and a test CD. `-WhatIf` changes nothing.
+
+## [0.2.8-jmb.6] - 2026-10-21
+
+- **Fixed**: MakeMKV (bundled in the upstream base image) had hit its hard version-expiry and refused to run at all, even with a key ("This application version is too old"), blocking every DVD/Blu-ray rip. `arm/Dockerfile` now rebuilds MakeMKV from the current latest release on every image build, so it stays current automatically. (jmbrenot-infra/ARM-HASS-Addon#15)
 
 ## [0.2.8-jmb.4] - 2026-10-18
 
