@@ -4,11 +4,14 @@ All notable changes to the ARM Home Assistant add-on are documented in this file
 
 ## [Unreleased]
 
-- **Fixed**: The MakeMKV rebuilt by #15 was never actually used: `makemkv-bin`'s own `make install` places the binary at `/usr/bin/makemkvcon`, but ARM calls `/usr/local/bin/makemkvcon` (hardcoded) -- the upstream base image's stale one. `/usr/local/bin/makemkvcon` is now a symlink to the freshly built binary. Also removes #17's one-shot startup diagnostic, which did its job identifying this. (jmbrenot-infra/ARM-HASS-Addon#19)
 - **Added**: Workflow `Upstream watch` (every Monday): opens one issue (label `upstream`) per new mliradelc add-on tag or ARM release, and tells whether a Docker image exists for that ARM release. Reference versions are the `io.jmbrenot.upstream.addon` / `io.jmbrenot.upstream.arm` labels of `arm/Dockerfile`.
 - **Added**: Workflow `Build ARM base image`: builds `ghcr.io/jmbrenot-infra/arm-hass-addon:arm-<version>` (linux/amd64) from `1337server/automatic-ripping-machine:<version>` with the recipe in `.docker/Dockerfile`, now pinned by `ARG ARM_VERSION`.
 - **Added**: Workflow `Add-on image check` on pull requests: builds `arm/Dockerfile` and checks the anchors the fork relies on (`tests/check_anchors.sh`), plus shellcheck and actionlint.
 - **Added**: `tools/Update-ArmAddon.ps1`: `-Phase Prepare` prepares the upgrade branch and commit, `-Phase Deploy` installs the update without backup after checking that no rip is running, then checks the add-on log and a test CD. `-WhatIf` changes nothing.
+
+## [0.2.8-jmb.8] - 2026-10-21
+
+- **Fixed**: The MakeMKV rebuilt by #15 was never actually used: `makemkv-bin`'s own `make install` places the binary at `/usr/bin/makemkvcon`, but ARM calls `/usr/local/bin/makemkvcon` (hardcoded) -- the upstream base image's stale one. `/usr/local/bin/makemkvcon` is now a symlink to the freshly built binary. Also removes #17's one-shot startup diagnostic, which did its job identifying this. (jmbrenot-infra/ARM-HASS-Addon#19)
 
 ## [0.2.8-jmb.7] - 2026-10-21
 
