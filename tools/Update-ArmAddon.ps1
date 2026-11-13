@@ -249,25 +249,35 @@ function Assert-ArmIdle {
 }
 
 function Deploy-NasplusScripts {
-    param(
-        [string]$NasplusHost = '192.168.0.52',
-        [string]$NasplusUser = 'codex-temp',
-        [string]$KnownHostsPath = 'W:\nasplus_known_hosts'
-    )
+    # Where the scripts go is site configuration, not repository content: host, account, SSH key and
+    # known_hosts file are read from the vault ($EnvPath) by key name. A missing setting means this
+    # site has no such deployment: the step is skipped, not failed.
     $scriptsDir = Join-Path $RepoRoot 'tools\nasplus-scripts'
     $files = Get-ChildItem -Path $scriptsDir -Filter '*.py' -ErrorAction SilentlyContinue
-    if (-not $files) { Write-Warn2 "no scripts found in $scriptsDir, skipping NASPLUS deploy"; return }
+    if (-not $files) { Write-Warn2 "no scripts found in $scriptsDir, skipping NAS deploy"; return }
 
-    # codex-temp has no write access to /volume1/scripts (owned root:root). A one-time sudoers drop-in
-    # (/etc/sudoers.d/codex-temp-nasplus-scripts, NOPASSWD, scoped to exactly these mv/chown/chmod
-    # invocations) lets this run key-only, no password of any kind over the wire -- piping a password
-    # to `sudo -S` through PowerShell's redirected stdin was tried first and is NOT reliable (plink and
-    # the native ssh client both silently drop or mistime the piped bytes here; do not revert to it).
-    # Login itself still needs its own key, separate from codex-temp's shared DSM password.
+    $settings = @{}
+    foreach ($name in 'ARM_NAS_SCRIPTS_HOST', 'ARM_NAS_SCRIPTS_USER', 'ARM_NAS_SCRIPTS_KNOWN_HOSTS', 'ARM_NAS_SCRIPTS_SSH_PRIVATE_KEY_B64') {
+        try { $settings[$name] = Get-EnvValue -Path $EnvPath -Name $name } catch { $settings[$name] = $null }
+    }
+    $missing = @($settings.Keys | Where-Object { -not $settings[$_] } | Sort-Object)
+    if ($missing.Count -gt 0) {
+        Write-Warn2 "NAS scripts deploy skipped: $($missing -join ', ') not set in the vault"
+        return
+    }
+    $NasplusHost = $settings['ARM_NAS_SCRIPTS_HOST']
+    $NasplusUser = $settings['ARM_NAS_SCRIPTS_USER']
+    $KnownHostsPath = $settings['ARM_NAS_SCRIPTS_KNOWN_HOSTS']
+
+    # The account cannot write to the target folder directly: files go to /tmp, then a sudo rule
+    # limited to these mv/chown/chmod calls installs them (see tools/nasplus-scripts/README.md).
+    # Key-only login, no password over the wire: piping a password to `sudo -S` through PowerShell's
+    # redirected stdin was tried first and is NOT reliable (plink and the native ssh client both
+    # silently drop or mistime the piped bytes here; do not revert to it).
     $keyPath = [System.IO.Path]::GetTempFileName()
     try {
-        $keyB64 = Get-EnvValue -Path $EnvPath -Name 'CODEX_TEMP_NASPLUS_SSH_PRIVATE_KEY_B64'
-        [System.IO.File]::WriteAllBytes($keyPath, [System.Convert]::FromBase64String($keyB64))
+        [System.IO.File]::WriteAllBytes($keyPath, [System.Convert]::FromBase64String($settings['ARM_NAS_SCRIPTS_SSH_PRIVATE_KEY_B64']))
+        $settings.Clear()
         # OpenSSH refuses a private key file with inherited/broad ACLs ("Bad permissions") -- reset to
         # the current user only (equivalent of chmod 600), via .NET ACL cmdlets (not icacls.exe).
         $acl = New-Object System.Security.AccessControl.FileSecurity
@@ -277,7 +287,7 @@ function Deploy-NasplusScripts {
 
         $sshArgs = @('-i', $keyPath, '-o', "UserKnownHostsFile=$KnownHostsPath", '-o', 'StrictHostKeyChecking=yes')
         foreach ($f in $files) {
-            # -O forces the legacy SCP protocol: this DSM's default SFTP subsystem for codex-temp
+            # -O forces the legacy SCP protocol: this DSM's default SFTP subsystem for this account
             # rejects absolute paths like /tmp (confirmed empirically), legacy SCP does not.
             & scp -O @sshArgs $f.FullName "${NasplusUser}@${NasplusHost}:/tmp/$($f.Name)" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "scp failed for $($f.Name)" }
@@ -286,7 +296,7 @@ function Deploy-NasplusScripts {
         $remoteScript = "for f in $names; do sudo mv /tmp/`$f /volume1/scripts/`$f && sudo chown root:root /volume1/scripts/`$f && sudo chmod 755 /volume1/scripts/`$f; done"
         $out = & ssh @sshArgs "${NasplusUser}@${NasplusHost}" $remoteScript 2>&1
         if ($LASTEXITCODE -ne 0) { throw "remote install failed: $out" }
-        Write-Ok "$($files.Count) script(s) deployed to NASPLUS /volume1/scripts/ ($names)"
+        Write-Ok "$($files.Count) script(s) deployed to the NAS /volume1/scripts/ ($names)"
     } finally {
         # The ACL set above already grants the current user explicit FullControl, which is enough
         # to delete the file regardless of inheritance protection -- no need to touch the ACL again.

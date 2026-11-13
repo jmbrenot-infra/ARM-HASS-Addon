@@ -20,10 +20,25 @@ impossible d'en créer une seconde depuis le CLI).
 
 ## Déploiement
 
-Automatique via `tools/Update-ArmAddon.ps1 -Phase Deploy` (voir `Deploy-NasplusScripts` dans ce
-script) : à chaque mise à jour réussie de l'add-on, ces fichiers sont poussés vers
-`/volume1/scripts/` sur NASPLUS (compte DSM `codex-temp`, `pscp` + `sudo mv`/`chown`/`chmod`, le
-compte n'ayant pas les droits d'écriture directs sur ce dossier appartenant à `root`).
+Automatique via `tools/Update-ArmAddon.ps1 -Phase Deploy` (fonction `Deploy-NasplusScripts`) : à chaque
+mise à jour réussie de l'add-on, ces fichiers sont poussés vers `/volume1/scripts/` sur le NAS
+(`scp` vers `/tmp`, puis `sudo mv`/`chown`/`chmod`, le compte utilisé n'ayant pas les droits
+d'écriture directs sur ce dossier appartenant à `root`).
+
+### Réglages (dans le coffre, jamais dans ce dépôt)
+
+Ce dépôt est public : l'hôte, le compte et la clé ne figurent pas dans le code. Le script les lit par
+leur nom dans le coffre local (`%USERPROFILE%\.ha-secrets\.env`) :
+
+| Clé | Rôle |
+|---|---|
+| `ARM_NAS_SCRIPTS_HOST` | Nom ou adresse du NAS cible |
+| `ARM_NAS_SCRIPTS_USER` | Compte SSH utilisé pour le dépôt |
+| `ARM_NAS_SCRIPTS_SSH_PRIVATE_KEY_B64` | Clé privée SSH de ce compte, encodée en Base64 |
+| `ARM_NAS_SCRIPTS_KNOWN_HOSTS` | Chemin du fichier `known_hosts` contenant la clé d'hôte du NAS |
+
+Si l'un de ces réglages manque dans le coffre, l'étape est sautée avec un avertissement (la mise à
+jour de l'add-on n'échoue pas).
 
 Pour un déploiement manuel ponctuel (sans passer par une mise à jour de l'add-on) :
 
@@ -33,31 +48,26 @@ Import-Module .\tools\ArmAddonUpgrade.psm1 -Force
 Deploy-NasplusScripts
 ```
 
-### Prérequis NASPLUS (persistant, à ne faire qu'une fois)
+### Prérequis sur le NAS (persistant, à ne faire qu'une fois)
 
-`codex-temp` n'a pas les droits d'écriture sur `/volume1/scripts` (appartient à `root:root`). Une
-règle sudoers dédiée, scopée à exactement ces 3 commandes, a été créée directement en root sur
-NASPLUS le 2026-10-20 :
+Le compte de dépôt n'a pas les droits d'écriture sur `/volume1/scripts` (appartient à `root:root`).
+Une règle sudoers dédiée, limitée à exactement ces 3 commandes, est créée en root sur le NAS, dans un
+fichier de `/etc/sudoers.d/` (permissions 0440) :
 
 ```
-# /etc/sudoers.d/codex-temp-nasplus-scripts (permissions 0440)
-codex-temp ALL=(root) NOPASSWD: /bin/mv /tmp/*.py /volume1/scripts/*.py, /bin/chown root\:root /volume1/scripts/*.py, /bin/chmod 755 /volume1/scripts/*.py
+<compte> ALL=(root) NOPASSWD: /bin/mv /tmp/*.py /volume1/scripts/*.py, /bin/chown root\:root /volume1/scripts/*.py, /bin/chmod 755 /volume1/scripts/*.py
 ```
 
-Vérifier qu'elle est toujours active : `sudo -l -U codex-temp` (en root sur NASPLUS) doit lister ces
+Vérifier qu'elle est toujours active : `sudo -l -U <compte>` (en root sur le NAS) doit lister ces
 3 commandes en `NOPASSWD`.
 
-**Persistance** : `/etc/sudoers.d/` et `/volume1/scripts/` survivent aux redémarrages normaux de
-NASPLUS (comportement standard DSM -- `/volume1` est le volume de données, `/etc` fait partie du
-système mais n'est pas réinitialisé à un simple reboot). **Pas de garantie en revanche lors d'une
-mise à jour majeure de DSM** (changement de version, pas un simple patch) : Synology peut dans ce cas
-régénérer certains fichiers système. Si les scripts de maintenance s'arrêtent de fonctionner après une
-telle mise à jour, revérifier `sudo -l -U codex-temp` en premier et recréer la règle ci-dessus si
-besoin -- aucune automatisation ne la recrée toute seule (`synoschedtask` n'expose pas de tâche
-déclenchée au démarrage via son CLI pour fiabiliser ça).
+**Persistance** : `/etc/sudoers.d/` et `/volume1/scripts/` survivent aux redémarrages normaux du NAS
+(comportement standard DSM). **Pas de garantie en revanche lors d'une mise à jour majeure de DSM** :
+Synology peut dans ce cas régénérer certains fichiers système. Si les scripts de maintenance
+s'arrêtent de fonctionner après une telle mise à jour, revérifier `sudo -l -U <compte>` en premier et
+recréer la règle ci-dessus si besoin -- aucune automatisation ne la recrée toute seule.
 
-L'authentification SSH utilise la clé dédiée `CODEX_TEMP_NASPLUS_SSH_PRIVATE_KEY_B64` du coffre
-(`%USERPROFILE%\.ha-secrets\.env`), pas le mot de passe partagé `CODEX_TEMP_PASS` -- piper un mot de
-passe à `sudo -S` à travers PowerShell s'est révélé peu fiable (voir le commentaire dans
-`Deploy-NasplusScripts`), d'où la clé + le NOPASSWD scopé plutôt qu'une saisie de mot de passe à
-distance.
+L'authentification SSH se fait par clé (clé `ARM_NAS_SCRIPTS_SSH_PRIVATE_KEY_B64` du coffre), jamais
+par mot de passe -- piper un mot de passe à `sudo -S` à travers PowerShell s'est révélé peu fiable
+(voir le commentaire dans `Deploy-NasplusScripts`), d'où la clé et la règle sudoers limitée plutôt
+qu'une saisie de mot de passe à distance.

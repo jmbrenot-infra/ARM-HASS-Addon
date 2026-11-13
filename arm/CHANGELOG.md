@@ -4,6 +4,7 @@ All notable changes to the ARM Home Assistant add-on are documented in this file
 
 ## [Unreleased]
 
+- **Changed**: `tools/Update-ArmAddon.ps1 -Phase Deploy` reads the target of the NAS maintenance scripts (host, account, SSH key, known_hosts file) from the local vault by key name (`ARM_NAS_SCRIPTS_*`, see `tools/nasplus-scripts/README.md`) instead of values written in the script; the step is skipped with a warning when they are not set.
 - **Fixed**: `tools/Update-ArmAddon.ps1 -Phase Deploy` no longer stops on the expected client timeout of the install call under PowerShell 7; it continues to wait for the installed version. (jmbrenot-infra/ARM-HASS-Addon#28)
 - **Added**: Workflow `Upstream watch` (every Monday): opens one issue (label `upstream`) per new mliradelc add-on tag or ARM release, and tells whether a Docker image exists for that ARM release. Reference versions are the `io.jmbrenot.upstream.addon` / `io.jmbrenot.upstream.arm` labels of `arm/Dockerfile`.
 - **Added**: Workflow `Build ARM base image`: builds `ghcr.io/jmbrenot-infra/arm-hass-addon:arm-<version>` (linux/amd64) from `1337server/automatic-ripping-machine:<version>` with the recipe in `.docker/Dockerfile`, now pinned by `ARG ARM_VERSION`.
