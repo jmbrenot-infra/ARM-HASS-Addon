@@ -72,6 +72,13 @@ ENTRYPOINT ["/entry_jmb.sh"]
 COPY rootfs/defaults/arm.yaml /defaults/arm.yaml
 COPY rootfs/defaults/abcde.conf /defaults/abcde.conf
 
+# Complete the album art after an audio CD rip: bounded JPEG as folder.jpg and as the playlist
+# image, embedded in the tracks abcde left without art (ARM-HASS-Addon#26). ImageMagick gives
+# `convert` to that script and `identify`/`convert` to abcde's own getalbumart step; it is
+# installed here, in its own layer, so the MakeMKV build layer above stays cached.
+RUN apt-get update && apt-get install -y --no-install-recommends imagemagick     && rm -rf /var/lib/apt/lists/*
+COPY rootfs/arm_album_art.py /usr/local/bin/arm_album_art.py
+
 # Ask Music Assistant to sync after each rip (options ma_url, ma_token, ma_provider).
 COPY rootfs/arm_ma_sync.py /usr/local/bin/arm_ma_sync.py
 

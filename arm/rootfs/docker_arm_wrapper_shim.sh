@@ -33,9 +33,10 @@ fi
 LOGPATH=$(grep -m 1 '^LOGPATH:' /etc/arm/config/arm.yaml 2>/dev/null | sed -e 's/^LOGPATH:[[:space:]]*//' -e 's/[[:space:]]*#.*$//' -e 's/"//g')
 mkdir -p "${LOGPATH:-/media/arm/logs}/progress"
 
-# Run the original wrapper (it waits for the end of the rip), then ask Music Assistant to
-# sync and move a finished DVD/Blu-ray rip next to its matching album (arm_video_to_album.py
-# is a no-op for an audio CD job -- ARM-HASS-Addon#21).
+# Run the original wrapper (it waits for the end of the rip), then complete the album art of
+# an audio CD (arm_album_art.py, before the sync so Music Assistant sees the final files --
+# ARM-HASS-Addon#26), ask Music Assistant to sync, and move a finished DVD/Blu-ray rip next to
+# its matching album (arm_video_to_album.py is a no-op for an audio CD job -- ARM-HASS-Addon#21).
 # shellcheck disable=SC2016 # $0 and $1 are expanded by the child bash, on purpose
-setsid bash -c '"$0" "$1"; python3 /usr/local/bin/arm_ma_sync.py; python3 /usr/local/bin/arm_video_to_album.py "$1"' "$ORIG" "$DEVNAME" >> "$ADDON_LOG" 2>&1 < /dev/null &
+setsid bash -c '"$0" "$1"; python3 /usr/local/bin/arm_album_art.py; python3 /usr/local/bin/arm_ma_sync.py; python3 /usr/local/bin/arm_video_to_album.py "$1"' "$ORIG" "$DEVNAME" >> "$ADDON_LOG" 2>&1 < /dev/null &
 exit 0

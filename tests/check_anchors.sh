@@ -17,10 +17,12 @@ for f in /run.sh /entry_jmb.sh /usr/local/bin/arm_disc_watcher.sh; do
     check "$f is executable" test -x "$f"
 done
 check "/run.sh still sets up /etc/arm/config" grep -q /etc/arm/config /run.sh
-for cmd in udevadm python3 abcde setsid flac; do
+for cmd in udevadm python3 abcde setsid flac metaflac convert identify; do
     check "command $cmd" command -v "$cmd"
 done
 check "arm_ma_sync.py compiles" python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/arm_ma_sync.pyc", doraise=True)' /usr/local/bin/arm_ma_sync.py
+check "arm_album_art.py compiles" python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/arm_album_art.pyc", doraise=True)' /usr/local/bin/arm_album_art.py
+check "shim runs arm_album_art.py before the Music Assistant sync" grep -q 'arm_album_art.py; python3 /usr/local/bin/arm_ma_sync.py' "$DOCKER_DIR/docker_arm_wrapper.sh"
 check "arm_video_to_album.py compiles" python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/arm_video_to_album.pyc", doraise=True)' /usr/local/bin/arm_video_to_album.py
 
 if [ -r /opt/arm/VERSION ]; then
