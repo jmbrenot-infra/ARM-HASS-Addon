@@ -75,15 +75,16 @@ Le déploiement transfère `install.sh` avec des fins de ligne LF, vérifie `sh 
 Il n'appelle aucune opération Home Assistant et n'installe pas automatiquement la dépendance Python.
 
 Le compte de dépôt n'a pas les droits d'écriture sur `/volume1/scripts` (appartient à `root:root`).
-Une règle sudoers dédiée, limitée à exactement ces 3 commandes, est créée en root sur le NAS, dans un
+Une règle sudoers dédiée est créée en root sur le NAS, dans un
 fichier de `/etc/sudoers.d/` (permissions 0440) :
 
 ```
-<compte> ALL=(root) NOPASSWD: /bin/mv /tmp/*.py /volume1/scripts/*.py, /bin/chown root\:root /volume1/scripts/*.py, /bin/chmod 755 /volume1/scripts/*.py
+<compte> ALL=(root) NOPASSWD: /bin/mv /tmp/<nom>.py /volume1/scripts/<nom>.py, /bin/chown root\:root /volume1/scripts/<nom>.py, /bin/chmod 755 /volume1/scripts/<nom>.py
 ```
 
-Vérifier qu'elle est toujours active : `sudo -l -U <compte>` (en root sur le NAS) doit lister ces
-3 commandes en `NOPASSWD`.
+Décliner les trois commandes avec chacun des huit noms explicites de `install.sh` (24 commandes),
+sans joker. Vérifier qu'elle est toujours active : `sudo -l -U <compte>` (en root sur le NAS)
+doit lister les 24 commandes en `NOPASSWD`.
 
 **Persistance** : `/etc/sudoers.d/` et `/volume1/scripts/` survivent aux redémarrages normaux du NAS
 (comportement standard DSM). **Pas de garantie en revanche lors d'une mise à jour majeure de DSM** :
