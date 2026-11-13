@@ -193,3 +193,29 @@ def test_mtime_gap_detection_still_works_without_existing_cd_directories(tmp_pat
         ("01 - First disc.flac", 1),
         ("01 - Second disc.flac", 2),
     ]
+
+
+def test_sorted_compilation_names_and_playlist_are_unchanged(tmp_path, monkeypatch):
+    root = tmp_path / 'Rips-CD'
+    album = root / 'Various Artists' / 'Compilation'
+    for disc in (1, 2):
+        write_test_flac(album / f'CD{disc}' / '01 - Artist - Song_.flac',
+                        'Song?', 1, f'disc-{disc}', disc, 2)
+    playlist = root / 'Various Artists-Compilation.m3u'
+    playlist.write_text('existing playlist\n', encoding='utf-8')
+    before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in root.rglob('*') if p.is_file()}
+    run_fix(root, monkeypatch)
+    assert {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in root.rglob('*') if p.is_file()} == before
+
+
+def test_conflicting_destinations_skip_album_without_partial_writes(tmp_path, monkeypatch):
+    root = tmp_path / 'Rips-CD'
+    album = root / 'Artist' / 'Album'
+    write_test_flac(album / '1-01 - A.flac', 'Same', 1)
+    write_test_flac(album / '1-01 - B.flac', 'Same', 1)
+    write_test_flac(album / '2-01 - C.flac', 'Other', 1)
+    before = {p: p.read_bytes() for p in album.rglob('*.flac')}
+    monkeypatch.setattr(sys, 'argv', ['fix_multidisc_albums.py', '--root', str(root)])
+    assert main() == 1
+    assert {p: p.read_bytes() for p in album.rglob('*.flac')} == before
+    assert not (album / 'CD1').exists()

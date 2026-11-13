@@ -1,8 +1,9 @@
-# Scripts de maintenance NASPLUS
+# Scripts de maintenance de la bibliothèque musicale sur NAS
 
-Scripts Python déployés sur NASPLUS (`/volume1/scripts/`), exécutés par la tâche planifiée DSM
-horaire existante (ID 11, "Normalize Unknown Album Tags" -- `synoschedtask` n'a pas de `--add`/`--set`,
-impossible d'en créer une seconde depuis le CLI).
+Scripts Python à déployer sur le NAS qui héberge la bibliothèque active (`/volume1/scripts/`).
+Le nom historique du dossier et de `Deploy-NasplusScripts` est conservé pour les outils existants ;
+la cible réelle vient exclusivement du coffre. Après une migration du partage, il faut aussi migrer
+la tâche DSM : les scripts traitent le `/volume1/music/Rips-CD` local, pas un partage distant.
 
 - `normalize_unknown_album_tags.py` -- point d'entrée de la tâche planifiée. Désambiguïse les tags
   `ALBUM` des CD non identifiés (`Unknown Album` -> `Unknown Album (<hash cddb>)`), puis appelle
@@ -14,6 +15,9 @@ impossible d'en créer une seconde depuis le CLI).
   (un hash distinct par disque physique), puis en dernier recours un écart de date de modification
   entre pistes (peu fiable, loggué comme tel). Régénère aussi le `.m3u` racine de l'album
   (`<Artiste>-<Album>.m3u`) pour pointer vers les nouveaux chemins `CDn/`.
+  Les noms des pistes déjà dans `CDn` sont conservés, notamment les artistes des compilations.
+  Un album déjà conforme ne provoque aucune écriture, playlist comprise. Une collision de destination
+  fait ignorer tout l'album avec un code d'échec, avant toute écriture.
 - `apply_unknown_album_tag_plan.py`, `export_unknown_album_discids.py`, `inventory_unknown_albums.py`,
   `query_gnudb.py`, `verify_unknown_album_state.py` -- outils d'investigation/application ponctuels
   utilisés pour le correctif rétroactif initial (ticket HA-Auzeville#16).
@@ -43,12 +47,32 @@ jour de l'add-on n'échoue pas).
 Pour un déploiement manuel ponctuel (sans passer par une mise à jour de l'add-on) :
 
 ```powershell
-Import-Module .\tools\ArmAddonUpgrade.psm1 -Force
-. .\tools\Update-ArmAddon.ps1  # ou copier la fonction Deploy-NasplusScripts dans une session
-Deploy-NasplusScripts
+.\tools\Update-ArmAddon.ps1 -Phase NasScripts -WhatIf
+.\tools\Update-ArmAddon.ps1 -Phase NasScripts
 ```
 
 ### Prérequis sur le NAS (persistant, à ne faire qu'une fois)
+
+1. Vérifier en root qu'aucune tâche de maintenance équivalente n'existe déjà, y compris dans
+   `/usr/syno/etc/synoschedule.d/` et `/etc/crontab`.
+2. Vérifier `/usr/bin/python3` et `mutagen`. DSM peut fournir Python 3.8 sans `pip` ni `mutagen`.
+   Installer alors le paquet officiel `mutagen==1.47.0` dans `/volume1/scripts/vendor/mutagen/`
+   (distribution Python pure, compatible 3.8), appartenant à root. Les deux scripts de maintenance
+   cherchent automatiquement ce dossier ; aucune modification du Python système n'est nécessaire.
+3. Créer dans DSM une tâche **désactivée**, quotidienne, répétée chaque heure de 00 h à 23 h,
+   exécutée par root (accès au partage et au dossier des scripts). Commande :
+
+   ```sh
+   /usr/bin/python3 /volume1/scripts/normalize_unknown_album_tags.py >> /volume1/scripts/rips-maintenance.log 2>&1
+   ```
+
+4. Déployer, puis lancer `/usr/bin/python3 /volume1/scripts/normalize_unknown_album_tags.py --dry-run`.
+   Relire le plan avant tout passage en écriture. Après validation, exécuter une fois, contrôler le
+   journal et une seconde simulation sans changement, puis activer la tâche cible et désactiver
+   l'ancienne tâche. Ne pas supprimer l'ancienne bibliothèque conservée pour retour arrière.
+
+Le déploiement transfère `install.sh` avec des fins de ligne LF, vérifie `sh -n`, puis l'exécute.
+Il n'appelle aucune opération Home Assistant et n'installe pas automatiquement la dépendance Python.
 
 Le compte de dépôt n'a pas les droits d'écriture sur `/volume1/scripts` (appartient à `root:root`).
 Une règle sudoers dédiée, limitée à exactement ces 3 commandes, est créée en root sur le NAS, dans un

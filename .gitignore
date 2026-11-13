@@ -6,3 +6,5 @@ Icon?
 ._*
 .Spotlight-V100
 .Trashes
+__pycache__/
+.pytest_cache/
