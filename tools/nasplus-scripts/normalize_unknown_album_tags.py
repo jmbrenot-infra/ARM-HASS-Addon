@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+# DSM's system Python has no pip; keep the optional dependency local to the scripts.
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'vendor'))
 from mutagen.flac import FLAC
 
 

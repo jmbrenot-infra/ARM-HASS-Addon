@@ -28,6 +28,7 @@ import shutil
 import sys
 from collections import defaultdict
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vendor'))
 from mutagen.flac import FLAC
 
 DEFAULT_ROOT = "/volume1/music/Rips-CD"
@@ -203,6 +204,9 @@ def plan_album(album_path: str):
             except (TypeError, ValueError):
                 local_track_fmt = local_track
             new_name = f"{local_track_fmt} - {sanitize(d['title'] or 'Unknown')}.flac"
+            if d['current_disc_num'] is not None:
+                # Existing CDn names may include compilation artists or SMB-safe punctuation.
+                new_name = d['name']
             new_rel = os.path.join(f"CD{disc_num}", new_name)
             new_path = os.path.join(album_path, new_rel)
             expected_disc_num = [str(disc_num)]
@@ -238,7 +242,14 @@ def main() -> int:
             failures += 1
             print(f"Failed to inspect {album_path}: {error}", file=sys.stderr)
             continue
-        if not plan:
+        if not plan or not any(it['needs_move'] or it['needs_retag'] for it in plan):
+            continue
+        destinations = [os.path.normpath(os.path.join(album_path, it['new_rel'])) for it in plan]
+        if len(set(destinations)) != len(destinations) or any(
+            it['needs_move'] and os.path.exists(dest) for it, dest in zip(plan, destinations)
+        ):
+            failures += 1
+            print(f"Conflicting destination in {album_path}; album skipped", file=sys.stderr)
             continue
         albums_found += 1
         discs = sorted(set(p["disc_num"] for p in plan))

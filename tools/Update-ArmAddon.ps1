@@ -26,7 +26,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('Prepare', 'Deploy')][string]$Phase,
+    [Parameter(Mandatory = $true)][ValidateSet('Prepare', 'Deploy', 'NasScripts')][string]$Phase,
     [ValidateSet('Addon', 'Arm')][string]$Source,
     [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version,
     [ValidatePattern('^\d+\.\d+\.\d+$')][string]$ArmVersion,
@@ -249,6 +249,7 @@ function Assert-ArmIdle {
 }
 
 function Deploy-NasplusScripts {
+    if ($WhatIfPreference) { Write-Warn2 'simulation: NAS scripts deploy skipped'; return }
     # Where the scripts go is site configuration, not repository content: host, account, SSH key and
     # known_hosts file are read from the vault ($EnvPath) by key name. A missing setting means this
     # site has no such deployment: the step is skipped, not failed.
@@ -275,6 +276,7 @@ function Deploy-NasplusScripts {
     # redirected stdin was tried first and is NOT reliable (plink and the native ssh client both
     # silently drop or mistime the piped bytes here; do not revert to it).
     $keyPath = [System.IO.Path]::GetTempFileName()
+    $installerPath = [System.IO.Path]::GetTempFileName()
     try {
         [System.IO.File]::WriteAllBytes($keyPath, [System.Convert]::FromBase64String($settings['ARM_NAS_SCRIPTS_SSH_PRIVATE_KEY_B64']))
         $settings.Clear()
@@ -292,15 +294,21 @@ function Deploy-NasplusScripts {
             & scp -O @sshArgs $f.FullName "${NasplusUser}@${NasplusHost}:/tmp/$($f.Name)" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "scp failed for $($f.Name)" }
         }
-        $names = ($files | ForEach-Object { $_.Name }) -join ' '
-        $remoteScript = "for f in $names; do sudo mv /tmp/`$f /volume1/scripts/`$f && sudo chown root:root /volume1/scripts/`$f && sudo chmod 755 /volume1/scripts/`$f; done"
-        $out = & ssh @sshArgs "${NasplusUser}@${NasplusHost}" $remoteScript 2>&1
+        $installer = Join-Path $scriptsDir 'install.sh'
+        $installerText = [System.IO.File]::ReadAllText($installer).Replace("`r", '')
+        [System.IO.File]::WriteAllText($installerPath, $installerText, (New-Object System.Text.UTF8Encoding($false)))
+        & scp -O @sshArgs $installerPath "${NasplusUser}@${NasplusHost}:/tmp/arm-install-scripts.sh" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'installer transfer failed' }
+        $out = & ssh @sshArgs "${NasplusUser}@${NasplusHost}" '/bin/sh -n /tmp/arm-install-scripts.sh' 2>&1
+        if ($LASTEXITCODE -ne 0) { throw 'installer syntax invalid' }
+        $out = & ssh @sshArgs "${NasplusUser}@${NasplusHost}" '/bin/sh /tmp/arm-install-scripts.sh' 2>&1
         if ($LASTEXITCODE -ne 0) { throw "remote install failed: $out" }
-        Write-Ok "$($files.Count) script(s) deployed to the NAS /volume1/scripts/ ($names)"
+        Write-Ok "$($files.Count) script(s) deployed to the NAS /volume1/scripts/"
     } finally {
         # The ACL set above already grants the current user explicit FullControl, which is enough
         # to delete the file regardless of inheritance protection -- no need to touch the ACL again.
         Remove-Item -Path $keyPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -403,4 +411,4 @@ function Invoke-Deploy {
     }
 }
 
-if ($Phase -eq 'Prepare') { Invoke-Prepare } else { Invoke-Deploy }
+if ($Phase -eq 'Prepare') { Invoke-Prepare } elseif ($Phase -eq 'NasScripts') { Deploy-NasplusScripts } else { Invoke-Deploy }
