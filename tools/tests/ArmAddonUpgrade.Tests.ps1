@@ -117,3 +117,37 @@ Describe 'Find-LogLine' {
         Find-LogLine -LogText $log -Pattern 'nothing' | Should BeNullOrEmpty
     }
 }
+
+Describe 'Test-ClientRequestTimeout' {
+    It 'recognizes the Windows PowerShell WebException timeout' {
+        $exception = New-Object System.Net.WebException('request timed out', [System.Net.WebExceptionStatus]::Timeout)
+        Test-ClientRequestTimeout $exception | Should Be $true
+    }
+    It 'recognizes the PowerShell 7 HttpClient timeout chain from an error record' {
+        $timeout = New-Object System.TimeoutException('request timed out')
+        $exception = New-Object System.Threading.Tasks.TaskCanceledException('request canceled', $timeout)
+        $record = New-Object System.Management.Automation.ErrorRecord($exception, 'RequestTimeout', [System.Management.Automation.ErrorCategory]::OperationTimeout, $null)
+        Test-ClientRequestTimeout $record | Should Be $true
+    }
+    It 'does not classify HTTP 401, 404, or 500 as timeouts' {
+        foreach ($status in @(401, 404, 500)) {
+            $exception = New-Object System.Net.WebException("HTTP $status", [System.Net.WebExceptionStatus]::ProtocolError)
+            Test-ClientRequestTimeout $exception | Should Be $false
+        }
+    }
+    It 'does not classify connection failures as timeouts' {
+        $exception = New-Object System.Net.WebException('connection refused', [System.Net.WebExceptionStatus]::ConnectFailure)
+        Test-ClientRequestTimeout $exception | Should Be $false
+    }
+    It 'does not classify DNS failures as timeouts' {
+        $exception = New-Object System.Net.WebException('name resolution failed', [System.Net.WebExceptionStatus]::NameResolutionFailure)
+        Test-ClientRequestTimeout $exception | Should Be $false
+    }
+    It 'does not classify a bare timeout as a client request timeout' {
+        $exception = New-Object System.TimeoutException('timed out')
+        Test-ClientRequestTimeout $exception | Should Be $false
+    }
+    It 'does not classify null as a timeout' {
+        Test-ClientRequestTimeout $null | Should Be $false
+    }
+}
