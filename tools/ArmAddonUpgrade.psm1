@@ -137,5 +137,31 @@ function Find-LogLine {
     return $null
 }
 
+# True only for a request timeout reported by Windows PowerShell or HttpClient.
+function Test-ClientRequestTimeout {
+    param([object]$ErrorObject)
+    if ($null -eq $ErrorObject) { return $false }
+
+    $exception = if ($ErrorObject -is [System.Management.Automation.ErrorRecord]) {
+        $ErrorObject.Exception
+    } else {
+        $ErrorObject
+    }
+    $hasCancellation = $false
+    while ($null -ne $exception) {
+        if ($exception -is [System.Net.WebException]) {
+            return ($exception.Status -eq [System.Net.WebExceptionStatus]::Timeout)
+        }
+        if ($exception -is [System.OperationCanceledException]) {
+            $hasCancellation = $true
+        }
+        if ($hasCancellation -and $exception -is [System.TimeoutException]) {
+            return $true
+        }
+        $exception = $exception.InnerException
+    }
+    return $false
+}
+
 Export-ModuleMember -Function Get-UpstreamLabels, Set-DockerfileBase, Test-VersionGreater, Test-OwnArmBase, Get-AddonVersion, Get-NextAddonVersion,
-    Set-AddonVersion, Add-ChangelogEntry, Get-EnvValue, Test-ArmIdle, Get-LogTextAfter, Find-LogLine
+    Set-AddonVersion, Add-ChangelogEntry, Get-EnvValue, Test-ArmIdle, Get-LogTextAfter, Find-LogLine, Test-ClientRequestTimeout

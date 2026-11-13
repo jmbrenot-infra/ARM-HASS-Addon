@@ -343,9 +343,12 @@ function Invoke-Deploy {
             Assert-ArmIdle
             try {
                 $null = Invoke-Ha -Method Post -Path '/api/services/update/install' -Body @{ entity_id = $UpdateEntity; backup = $false } -TimeoutSec 30
-            } catch [System.Net.WebException] {
-                if ($_.Exception.Status -ne [System.Net.WebExceptionStatus]::Timeout) { throw }
-                Write-Host '    (install still running in Home Assistant)' -ForegroundColor DarkGray
+            } catch {
+                if (Test-ClientRequestTimeout $_) {
+                    Write-Host '    (install still running in Home Assistant)' -ForegroundColor DarkGray
+                } else {
+                    throw
+                }
             }
             if (-not (Wait-Until -Condition { (Get-UpdateState).attributes.installed_version -eq $target } -Minutes 30 -What "installed_version = $target" -EverySeconds 30)) {
                 Show-LogTail
