@@ -9,6 +9,11 @@ All notable changes to the ARM Home Assistant add-on are documented in this file
 - **Added**: Workflow `Add-on image check` on pull requests: builds `arm/Dockerfile` and checks the anchors the fork relies on (`tests/check_anchors.sh`), plus shellcheck and actionlint.
 - **Added**: `tools/Update-ArmAddon.ps1`: `-Phase Prepare` prepares the upgrade branch and commit, `-Phase Deploy` installs the update without backup after checking that no rip is running, then checks the add-on log and a test CD. `-WhatIf` changes nothing.
 
+## [0.2.8-jmb.10] - 2026-11-13
+
+- **Fixed**: An oversized cover (seen: a 55 MB PNG from Cover Art Archive, saved by abcde as `cover.jpg`) was refused by metaflac ("file is too large", a FLAC picture block holds 16 MiB at most) while abcde still reported success: tracks ended up without art. ImageMagick is now installed in the image, and new installs make abcde always convert the cover to a JPEG fitting 1400x1400 (`ALBUMARTALWAYSCONVERT="y"`, `CONVERTOPTS="-resize 1400x1400>"`). Existing installs keep their `abcde.conf`: add both settings in the web UI "abcde Config" tab. (jmbrenot-infra/ARM-HASS-Addon#26)
+- **Added**: After an audio CD rip, `arm_album_art.py` writes the cover as `<Artist>/<Album>/folder.jpg` and as `<Artist>-<Album>.jpg` next to the playlist (the image Music Assistant shows for a `.m3u`), and embeds it in the FLAC tracks abcde left without art, logging a warning when it had to. Runs before the Music Assistant sync, never overwrites an existing image, works whatever the `abcde.conf` of an existing install says. (jmbrenot-infra/ARM-HASS-Addon#26)
+
 ## [0.2.8-jmb.9] - 2026-10-21
 
 - **Added**: After a DVD/Blu-ray rip, `arm_video_to_album.py` moves the resulting video (transcoded if HandBrake succeeded, otherwise the raw rip) next to its matching music album under `/media/music/<Artist>/<Album>/`, matched by keyword against the disc's label -- e.g. a bonus DVD bundled with a CD. No unambiguous match: moves to `Unknown Artist/Unknown Album_<job id>` instead of guessing, same convention as unidentified audio CDs. No-op for an audio CD job. (jmbrenot-infra/ARM-HASS-Addon#21)
