@@ -14,7 +14,8 @@ Describe 'Get-UpstreamLabels' {
         $labels.Arm | Should Be '2.20.5'
     }
     It 'throws when the labels are missing' {
-        { Get-UpstreamLabels -DockerfileText "FROM x:1`n" } | Should Throw
+        # Pester 3.4 under PowerShell 7 does not detect a bare "Should Throw": give the expected message.
+        { Get-UpstreamLabels -DockerfileText "FROM x:1`n" } | Should Throw 'not found in the Dockerfile'
     }
 }
 
@@ -40,7 +41,9 @@ Describe 'Test-OwnArmBase' {
 
 Describe 'Add-on version' {
     It 'reads the version' {
-        Get-AddonVersion -ConfigText $config | Should Be '0.2.8-jmb.4'
+        Get-AddonVersion -ConfigText "name: x`nversion: `"0.2.8-jmb.4`"`nslug: arm`n" | Should Be '0.2.8-jmb.4'
+        # The real file: whatever the current version is, it must be read in full.
+        Get-AddonVersion -ConfigText $config | Should Match '^\d+\.\d+\.\d+-jmb\.\d+$'
     }
     It 'increments jmb.N' {
         Get-NextAddonVersion -Current '0.2.8-jmb.4' | Should Be '0.2.8-jmb.5'
@@ -89,7 +92,7 @@ Describe 'Get-EnvValue' {
 Describe 'Test-ArmIdle' {
     It 'is idle with an empty object' { Test-ArmIdle -JoblistJson '{"results":{}}' | Should Be $true }
     It 'is idle with an empty list' { Test-ArmIdle -JoblistJson '{"results":[]}' | Should Be $true }
-    It 'throws without results (unknown state is not idle)' { { Test-ArmIdle -JoblistJson '{"success":false}' } | Should Throw }
+    It 'throws without results (unknown state is not idle)' { { Test-ArmIdle -JoblistJson '{"success":false}' } | Should Throw 'no results field' }
     It 'is busy with a job list' { Test-ArmIdle -JoblistJson '{"results":[{"job_id":1}]}' | Should Be $false }
     It 'is busy with a job' { Test-ArmIdle -JoblistJson '{"results":{"0":{"job_id":1}}}' | Should Be $false }
 }
